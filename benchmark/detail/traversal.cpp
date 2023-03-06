@@ -146,32 +146,24 @@ auto traversal_fn(ChainFn&& chain_fn)
 using std_traversal       = topo_traversal<>;
 using bmultimap_traversal = topo_traversal<boost::unordered_multimap>;
 
-NONIUS_BENCHMARK("DFS-SC", traversal_fn<dfs_traversal>(make_simple_chain))
-
-NONIUS_BENCHMARK("DFS-DC", traversal_fn<dfs_traversal>(make_diamond_chain))
-
-NONIUS_BENCHMARK("T-CMM-SC",
+NONIUS_BENCHMARK("SC-DFS", traversal_fn<dfs_traversal>(make_simple_chain))
+NONIUS_BENCHMARK("SC-T-CMM",
                  traversal_fn<naive_mmap_topo_traversal>(make_simple_chain))
-NONIUS_BENCHMARK("T-CMM-DC",
-                 traversal_fn<naive_mmap_topo_traversal>(make_diamond_chain))
-
-NONIUS_BENCHMARK("T-SUMM-SC", traversal_fn<std_traversal>(make_simple_chain))
-
-NONIUS_BENCHMARK("T-SUMM-DC", traversal_fn<std_traversal>(make_diamond_chain))
-
-NONIUS_BENCHMARK("T-BUMM-SC",
+NONIUS_BENCHMARK("SC-T-SUMM", traversal_fn<std_traversal>(make_simple_chain))
+NONIUS_BENCHMARK("SC-T-BUMM",
                  traversal_fn<bmultimap_traversal>(make_simple_chain))
-
-NONIUS_BENCHMARK("T-BUMM-DC",
-                 traversal_fn<bmultimap_traversal>(make_diamond_chain))
-
-NONIUS_BENCHMARK("T-BIMS-SC",
+NONIUS_BENCHMARK("SC-T-BIMS",
                  traversal_fn<topo_intrusive_traversal>(make_simple_chain))
-
-NONIUS_BENCHMARK("T-BIMS-DC",
-                 traversal_fn<topo_intrusive_traversal>(make_diamond_chain))
-
-NONIUS_BENCHMARK("T-BIMSRB-SC",
+NONIUS_BENCHMARK("SC-T-BIMSRB",
                  traversal_fn<topo_intrusive_traversal_rb>(make_simple_chain))
-NONIUS_BENCHMARK("T-BIMSRB-DC",
+
+NONIUS_BENCHMARK("DC-DFS", traversal_fn<dfs_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-CMM",
+                 traversal_fn<naive_mmap_topo_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-SUMM", traversal_fn<std_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-BUMM",
+                 traversal_fn<bmultimap_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-BIMS",
+                 traversal_fn<topo_intrusive_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-BIMSRB",
                  traversal_fn<topo_intrusive_traversal_rb>(make_diamond_chain))
