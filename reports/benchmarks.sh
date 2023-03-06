@@ -36,7 +36,7 @@ function _run_benchmark() {
   ${GIT_ROOT_DIR}/tools/with-tee.bash \
     ${OUTPUT_FILE} \
     ${BENCHMARK_RUNNER} -v \
-    -t "Traversal_${N}" \
+    -t "Traversal_N:${N}" \
     -r html \
     -s "${MEASUREMENTS}" \
     -p "N:${N}" \
@@ -44,12 +44,4 @@ function _run_benchmark() {
     "${FILTER_ARG}"
 }
 
-for N in 5 7 9 11 13 15
-do
-  _run_benchmark ${N} 
-done
-
-for N in 1024 2048 4096 16384 32768
-do
-  _run_benchmark ${N} "-f ^(?!DFS-DC).*"
-done
+_run_benchmark "*:2:2:10" "-f ^(?!DC-DFS).*"
