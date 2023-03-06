@@ -24,31 +24,32 @@
 using namespace lager;
 using namespace lager::detail;
 
-/**
- * Ensures the == test within a node always fails and stores an int so that we
- * can perform a sanity check on value propagation.
- **/
-struct unique_value
-{
-    long unsigned val = 0;
-    //    std::chrono::time_point<std::chrono::high_resolution_clock> tag =
-    //        std::chrono::high_resolution_clock::now();
-};
-bool operator==(const unique_value& x, const unique_value& y)
-{
-    return x.val == y.val;
-}
+using unique_value = long unsigned;
 
 using node_t      = reader_node<unique_value>;
 using merge_t     = reader_node<std::tuple<unique_value, unique_value>>;
 using node_ptr_t  = std::shared_ptr<node_t>;
 using merge_ptr_t = std::shared_ptr<merge_t>;
 
-const unique_value next(const unique_value& x) { return {.val = x.val + 1}; }
-const unique_value combine(const std::tuple<unique_value, unique_value>& tuple)
+auto combine(const auto&... xs)
 {
-    return {.val = (std::get<0>(tuple).val + std::get<1>(tuple).val) / 2 + 1};
+    auto M = std::max({xs...});
+    auto S = 1;
+
+    const auto comb = [M, &S](auto x) {
+        if (x != M)
+            S++;
+    };
+
+    (comb(xs), ...);
+
+    return M + S;
 }
+constexpr auto inline combine_tuple = [](const auto& t) {
+    return std::apply([](const auto&... xs) { return combine(xs...); }, t);
+};
+
+unique_value next(const unique_value& x) { return x + 1; }
 
 /**
  * A chain is a series of node such that, if the value of the chain root
@@ -59,7 +60,7 @@ struct chain
 {
     using state_t = decltype(make_state_node(unique_value{}));
 
-    unsigned long value() const { return last->last().val; }
+    unsigned long value() const { return last->last(); }
 
     state_t root    = make_state_node(unique_value{});
     node_ptr_t last = root;
@@ -115,14 +116,14 @@ chain make_diamond_chain(long unsigned n)
         auto xform1 = make_xform_reader_node(identity, p);
         auto xform2 = make_xform_reader_node(identity, p);
         auto merge  = make_merge_reader_node(std::make_tuple(xform1, xform2));
-        c.last =
-            make_xform_reader_node(zug::map(combine), std::make_tuple(merge));
+        c.last      = make_xform_reader_node(zug::map(combine_tuple),
+                                        std::make_tuple(merge));
     }
 
     return c;
 }
 
-NONIUS_PARAM(N, std::size_t{12})
+NONIUS_PARAM(N, std::size_t{16})
 
 template <typename Traversal, typename ChainFn>
 auto traversal_fn(ChainFn&& chain_fn)
@@ -137,7 +138,9 @@ auto traversal_fn(ChainFn&& chain_fn)
             Traversal t{c.root, n};
             t.visit();
             if (c.value() != n + 1)
-                throw std::runtime_error{"bad stuff!"};
+                throw std::runtime_error{"bad stuff! expected " +
+                                         std::to_string(n + 1) + " got " +
+                                         std::to_string(c.value())};
             return c.value();
         });
     };
