@@ -124,6 +124,36 @@ chain make_diamond_chain(long unsigned n)
     return c;
 }
 
+/**
+ *         Root---
+ *        / |    |
+ *       /  |    |
+ *      /   |    |
+ *     /    |    |
+ *    *    *     *
+ *  B --* C ---* D --* ...
+ **/
+chain make_god_chain(long unsigned n)
+{
+    auto c = chain();
+
+    auto r      = std::make_tuple(c.last);
+    auto xformr = make_xform_reader_node(identity, r);
+
+    for (long unsigned i = 0; i < n; ++i) {
+        auto p      = std::make_tuple(c.last);
+        auto xform1 = make_xform_reader_node(identity, p);
+        auto merge  = make_merge_reader_node(std::make_tuple(xformr, xform1));
+        c.last      = make_xform_reader_node(zug::map([](const auto& t) {
+                                            const auto& [a, b] = t;
+                                            return std::max(a, b) + 1;
+                                        }),
+                                        std::make_tuple(merge));
+    }
+
+    return c;
+}
+
 NONIUS_PARAM(N, std::size_t{16})
 
 template <typename Traversal, typename ChainFn>
@@ -174,3 +204,9 @@ NONIUS_BENCHMARK("DC-T-BIMSRB",
                  traversal_fn<topo_intrusive_traversal_rb>(make_diamond_chain))
 NONIUS_BENCHMARK("DC-T-TREAP",
                  traversal_fn<treap_traversal>(make_diamond_chain))
+NONIUS_BENCHMARK("GC-DFS", traversal_fn<dfs_traversal>(make_god_chain))
+NONIUS_BENCHMARK("GC-T-TREAP", traversal_fn<treap_traversal>(make_god_chain))
+NONIUS_BENCHMARK("GC-T-BIMS",
+                 traversal_fn<topo_intrusive_traversal>(make_god_chain))
+NONIUS_BENCHMARK("GC-T-BIMSRB",
+                 traversal_fn<topo_intrusive_traversal_rb>(make_god_chain))

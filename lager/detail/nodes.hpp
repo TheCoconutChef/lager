@@ -234,8 +234,8 @@ public:
             last_            = current_;
             needs_send_down_ = false;
             needs_notify_    = true;
-            for (auto& wchild : children_) {
-                if (auto child = wchild.lock()) {
+            for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+                if (auto child = it->lock()) {
                     child->schedule_or_send_down(t);
                 }
             }
