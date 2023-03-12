@@ -28,7 +28,7 @@ public:
 
     topo_intrusive_traversal(const std::shared_ptr<reader_node_base>& root,
                              std::size_t N)
-        : current_rank_(root->rank())
+        : current_rank_(root->rank)
         , buckets_(N * 4)
     {
         assert(root);
@@ -90,7 +90,7 @@ public:
 
     topo_intrusive_traversal_rb(const std::shared_ptr<reader_node_base>& root,
                                 std::size_t)
-        : current_rank_(root->rank())
+        : current_rank_(root->rank)
     {
         assert(root);
         schedule_.insert(*root);

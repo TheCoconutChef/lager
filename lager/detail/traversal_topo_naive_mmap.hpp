@@ -22,7 +22,7 @@ public:
     }
 
     naive_mmap_topo_traversal(reader_node_base* root)
-        : current_rank_(root->rank())
+        : current_rank_(root->rank)
         , schedule_({{current_rank_, std::vector{root}}})
     {
     }
@@ -37,7 +37,7 @@ public:
 
     void schedule(reader_node_base* n) override
     {
-        const auto r = n->rank();
+        const auto r = n->rank;
         auto& v      = schedule_[r];
         v.push_back(n);
         node_scheduled_ = true;

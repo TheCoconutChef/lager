@@ -291,9 +291,9 @@ TEST_CASE("node, rank is accurate")
     auto u = make_xform_reader_node(
         map([](auto tuple) { return std::get<0>(tuple); }), std::make_tuple(t));
 
-    CHECK(0 == x->rank());
-    CHECK(0 == y->rank());
-    CHECK(1 == z->rank());
-    CHECK(2 == t->rank());
-    CHECK(3 == u->rank());
+    CHECK(0 == x->rank);
+    CHECK(0 == y->rank);
+    CHECK(1 == z->rank);
+    CHECK(2 == t->rank);
+    CHECK(3 == u->rank);
 }

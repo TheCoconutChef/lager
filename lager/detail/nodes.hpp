@@ -91,16 +91,16 @@ struct reader_node_base
     virtual void schedule_or_send_down(traversal&) = 0;
     virtual void send_down(traversal&)             = 0;
     virtual void notify()                          = 0;
-    virtual long rank() const                      = 0;
+    long rank                                      = 0;
 };
 
 bool operator<(const reader_node_base& x, const reader_node_base& y)
 {
-    return x.rank() < y.rank();
+    return x.rank < y.rank;
 }
 bool operator>(const reader_node_base& x, const reader_node_base& y)
 {
-    return x.rank() > y.rank();
+    return x.rank > y.rank;
 }
 bool priority_order(const reader_node_base& x, const reader_node_base& y)
 {
@@ -113,13 +113,13 @@ long max_rank(const std::tuple<std::shared_ptr<Parents>...>& ps)
     constexpr auto max_fn = [comp](const auto&... ps) {
         return std::max<std::shared_ptr<reader_node_base>>({ps...}, comp);
     };
-    return std::apply(max_fn, ps)->rank();
+    return std::apply(max_fn, ps)->rank;
 }
 
 struct rank_is_key
 {
     using type = long;
-    type operator()(const reader_node_base& x) { return x.rank(); }
+    type operator()(const reader_node_base& x) { return x.rank; }
 };
 
 /*!
@@ -311,7 +311,6 @@ class inner_node<ValueT, zug::meta::pack<Parents...>, Base>
     using base_t = Base<ValueT>;
 
     std::tuple<std::shared_ptr<Parents>...> parents_;
-    long rank_ = 0;
 
 public:
     inner_node(ValueT init, std::tuple<std::shared_ptr<Parents>...>&& parents)
@@ -320,7 +319,7 @@ public:
     {
         if constexpr (sizeof...(Parents) == 0)
             return;
-        rank_ = max_rank(parents_) + 1;
+        this->rank = max_rank(parents_) + 1;
     }
 
     void refresh() final
@@ -341,8 +340,6 @@ public:
         push_up(std::forward<T>(value),
                 std::make_index_sequence<sizeof...(Parents)>{});
     }
-
-    long rank() const override { return rank_; }
 
     void schedule_or_send_down(traversal& t) override
     {
@@ -376,7 +373,6 @@ struct root_node : Base<T>
     using base_t::base_t;
 
     void refresh() final {}
-    long rank() const override final { return 0; }
 };
 
 template <typename... Nodes>

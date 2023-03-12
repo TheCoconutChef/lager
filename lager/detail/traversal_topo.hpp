@@ -19,7 +19,7 @@ public:
     }
 
     topo_traversal(reader_node_base* root)
-        : current_rank_(root->rank())
+        : current_rank_(root->rank)
         , schedule_{{current_rank_, {root}}}
     {
     }
@@ -34,7 +34,7 @@ public:
 
     void schedule(reader_node_base* n) override
     {
-        const auto r = n->rank();
+        const auto r = n->rank;
         schedule_.emplace(r, n);
         node_scheduled_ = true;
         last_rank_      = std::max<int>(last_rank_, r);
