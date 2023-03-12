@@ -82,11 +82,12 @@ struct reader_node_base
     reader_node_base& operator=(reader_node_base&&) = default;
     reader_node_base& operator=(const reader_node_base&) = delete;
 
-    virtual ~reader_node_base()        = default;
-    virtual void send_down()           = 0;
-    virtual void send_down(traversal&) = 0;
-    virtual void notify()              = 0;
-    virtual long rank() const          = 0;
+    virtual ~reader_node_base()                    = default;
+    virtual void send_down()                       = 0;
+    virtual void schedule_or_send_down(traversal&) = 0;
+    virtual void send_down(traversal&)             = 0;
+    virtual void notify()                          = 0;
+    virtual long rank() const                      = 0;
 };
 
 struct rank_is_key
@@ -209,6 +210,8 @@ public:
         }
     }
 
+    void schedule_or_send_down(traversal& t) override { this->send_down(t); }
+
     void send_down(traversal& t) final
     {
         recompute();
@@ -218,7 +221,7 @@ public:
             needs_notify_    = true;
             for (auto& wchild : children_) {
                 if (auto child = wchild.lock()) {
-                    t.schedule(child.get());
+                    child->schedule_or_send_down(t);
                 }
             }
         }
@@ -234,8 +237,8 @@ public:
             bool garbage = false;
 
             observers_(last_);
-            for (size_t i = 0, size = children_.size(); i < size; ++i) {
-                if (auto child = children_[i].lock()) {
+            for (const auto& wchild : children_) {
+                if (auto child = wchild.lock()) {
                     child->notify();
                 } else {
                     garbage = true;
@@ -325,6 +328,14 @@ public:
     }
 
     long rank() const override { return rank_; }
+
+    void schedule_or_send_down(traversal& t) override
+    {
+        if constexpr (sizeof...(Parents) > 1)
+            t.schedule(this);
+        else
+            this->send_down(t);
+    }
 
 private:
     template <typename T, std::size_t... Indices>
