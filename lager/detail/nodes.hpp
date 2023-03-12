@@ -48,24 +48,11 @@
 #include <algorithm>
 #include <boost/intrusive/set.hpp>
 #include <boost/intrusive/unordered_set.hpp>
-#include <functional>
 #include <memory>
 #include <vector>
 
 namespace lager {
 namespace detail {
-
-/*!
- * Allows comparing shared and weak pointers based on their owner.
- */
-constexpr struct
-{
-    template <typename T1, typename T2>
-    bool operator()(const T1& a, const T2& b)
-    {
-        return !a.owner_before(b) && !b.owner_before(a);
-    }
-} owner_equals{};
 
 /*!
  * Interface for children of a node and is used to propagate
@@ -189,10 +176,11 @@ public:
     void link(std::weak_ptr<reader_node_base> child)
     {
         using namespace std;
-        using std::placeholders::_1;
-        assert(find_if(begin(children_),
-                       end(children_),
-                       bind(owner_equals, child, _1)) == end(children_) &&
+        const auto owner_equals = [&child](const auto& w) -> bool {
+            return !w.owner_before(child) && !child.owner_before(w);
+        };
+        assert(find_if(begin(children_), end(children_), owner_equals) ==
+                   end(children_) &&
                "Child node must not be linked twice");
         children_.push_back(child);
     }
