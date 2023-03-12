@@ -9,22 +9,24 @@ template <template <typename...> typename Multimap = std::unordered_multimap>
 class topo_traversal : public traversal
 {
 public:
-    topo_traversal()                      = delete;
-    topo_traversal(const topo_traversal&) = delete;
+    topo_traversal()                                 = delete;
+    topo_traversal(const topo_traversal&)            = delete;
     topo_traversal& operator=(const topo_traversal&) = delete;
 
     topo_traversal(const std::shared_ptr<reader_node_base>& root, std::size_t)
         : topo_traversal(root.get())
-    {}
+    {
+    }
 
     topo_traversal(reader_node_base* root)
         : current_rank_(root->rank())
         , schedule_{{current_rank_, {root}}}
-    {}
+    {
+    }
 
     void visit() override
     {
-        while (node_scheduled_) {
+        while (node_scheduled_ || last_rank_ >= current_rank_) {
             node_scheduled_ = false;
             visit_rank_();
         }
@@ -32,8 +34,10 @@ public:
 
     void schedule(reader_node_base* n) override
     {
-        schedule_.emplace(n->rank(), n);
+        const auto r = n->rank();
+        schedule_.emplace(r, n);
         node_scheduled_ = true;
+        last_rank_      = std::max<int>(last_rank_, r);
     }
 
 private:
@@ -54,6 +58,7 @@ private:
 
     bool node_scheduled_                       = true;
     long current_rank_                         = 0;
+    long last_rank_                            = 0;
     Multimap<int, reader_node_base*> schedule_ = {};
 };
 

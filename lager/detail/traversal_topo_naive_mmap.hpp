@@ -18,16 +18,18 @@ public:
     naive_mmap_topo_traversal(const std::shared_ptr<reader_node_base>& root,
                               std::size_t)
         : naive_mmap_topo_traversal(root.get())
-    {}
+    {
+    }
 
     naive_mmap_topo_traversal(reader_node_base* root)
         : current_rank_(root->rank())
         , schedule_({{current_rank_, std::vector{root}}})
-    {}
+    {
+    }
 
     void visit() override
     {
-        while (node_scheduled_) {
+        while (node_scheduled_ || last_rank_ >= current_rank_) {
             node_scheduled_ = false;
             visit_rank_();
         }
@@ -35,9 +37,11 @@ public:
 
     void schedule(reader_node_base* n) override
     {
-        auto& v = schedule_[n->rank()];
+        const auto r = n->rank();
+        auto& v      = schedule_[r];
         v.push_back(n);
         node_scheduled_ = true;
+        last_rank_      = std::max<int>(last_rank_, r);
     }
 
 private:
@@ -51,6 +55,7 @@ private:
 
     bool node_scheduled_                                               = true;
     long current_rank_                                                 = 0;
+    int last_rank_                                                     = 0;
     std::unordered_map<long, std::vector<reader_node_base*>> schedule_ = {};
 };
 } // namespace detail

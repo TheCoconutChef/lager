@@ -37,11 +37,9 @@ public:
 
     void visit() override
     {
-        while (node_scheduled_) {
-            node_scheduled_ = false;
+        while (!schedule_.empty()) {
             visit_rank_();
         }
-        schedule_.clear();
     }
 
     void schedule(reader_node_base* n) override
@@ -49,7 +47,6 @@ public:
         // if node is already linked, it has already beek scheduled!
         if (!n->member_hook_.is_linked()) {
             schedule_.insert(*n);
-            node_scheduled_ = true;
         }
     }
 
@@ -58,16 +55,14 @@ private:
     {
         const auto range = schedule_.equal_range(current_rank_);
 
-        for (auto node = range.first; node != range.second; ++node) {
-            // WARN: modifying the map in which we're iterating within the loop,
-            // which is bad
-            node->send_down(*this);
-        }
+        schedule_.erase_and_dispose(range.first, range.second, [this](auto* n) {
+            n->send_down(*this);
+        });
+
         current_rank_++;
     }
 
-    bool node_scheduled_ = true;
-    long current_rank_   = 0;
+    long current_rank_ = 0;
 
     typename std::vector<unordered_map::bucket_type> buckets_;
     unordered_map schedule_{typename unordered_map::bucket_traits(
@@ -103,11 +98,9 @@ public:
 
     void visit() override
     {
-        while (node_scheduled_) {
-            node_scheduled_ = false;
+        while (!schedule_.empty()) {
             visit_rank_();
         }
-        schedule_.clear();
     }
 
     void schedule(reader_node_base* n) override
@@ -115,7 +108,6 @@ public:
         // if node is already linked, it has already beek scheduled!
         if (!n->member_hook_rb_.is_linked()) {
             schedule_.insert(*n);
-            node_scheduled_ = true;
         }
     }
 
@@ -124,16 +116,14 @@ private:
     {
         const auto range = schedule_.equal_range(current_rank_);
 
-        for (auto node = range.first; node != range.second; ++node) {
-            // WARN: modifying the map in which we're iterating within the loop,
-            // which is bad
-            node->send_down(*this);
-        }
+        schedule_.erase_and_dispose(range.first, range.second, [this](auto* n) {
+            n->send_down(*this);
+        });
+
         current_rank_++;
     }
 
-    bool node_scheduled_ = true;
-    long current_rank_   = 0;
+    long current_rank_ = 0;
 
     unordered_map schedule_{};
 };
