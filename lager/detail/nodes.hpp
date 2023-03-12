@@ -47,6 +47,7 @@
 
 #include <algorithm>
 #include <boost/intrusive/set.hpp>
+#include <boost/intrusive/treap_set.hpp>
 #include <boost/intrusive/unordered_set.hpp>
 #include <memory>
 #include <vector>
@@ -76,10 +77,13 @@ struct reader_node_base
 
     hook_type_rb member_hook_rb_{};
 
-    reader_node_base()                        = default;
-    reader_node_base(reader_node_base&&)      = default;
-    reader_node_base(const reader_node_base&) = delete;
-    reader_node_base& operator=(reader_node_base&&) = default;
+    using hook_type_treap = boost::intrusive::bs_set_member_hook<>;
+    hook_type_treap member_hook_treap_{};
+
+    reader_node_base()                                   = default;
+    reader_node_base(reader_node_base&&)                 = default;
+    reader_node_base(const reader_node_base&)            = delete;
+    reader_node_base& operator=(reader_node_base&&)      = default;
     reader_node_base& operator=(const reader_node_base&) = delete;
 
     virtual ~reader_node_base()                    = default;
@@ -89,6 +93,28 @@ struct reader_node_base
     virtual void notify()                          = 0;
     virtual long rank() const                      = 0;
 };
+
+bool operator<(const reader_node_base& x, const reader_node_base& y)
+{
+    return x.rank() < y.rank();
+}
+bool operator>(const reader_node_base& x, const reader_node_base& y)
+{
+    return x.rank() > y.rank();
+}
+bool priority_order(const reader_node_base& x, const reader_node_base& y)
+{
+    return x < y;
+}
+template <typename... Parents>
+long max_rank(const std::tuple<std::shared_ptr<Parents>...>& ps)
+{
+    constexpr auto comp = [](const auto& x, const auto& y) { return *x < *y; };
+    constexpr auto max_fn = [comp](const auto&... ps) {
+        return std::max<std::shared_ptr<reader_node_base>>({ps...}, comp);
+    };
+    return std::apply(max_fn, ps)->rank();
+}
 
 struct rank_is_key
 {
@@ -102,28 +128,16 @@ struct rank_is_key
 template <typename T>
 struct writer_node_base
 {
-    writer_node_base()                        = default;
-    writer_node_base(writer_node_base&&)      = default;
-    writer_node_base(const writer_node_base&) = delete;
-    writer_node_base& operator=(writer_node_base&&) = default;
+    writer_node_base()                                   = default;
+    writer_node_base(writer_node_base&&)                 = default;
+    writer_node_base(const writer_node_base&)            = delete;
+    writer_node_base& operator=(writer_node_base&&)      = default;
     writer_node_base& operator=(const writer_node_base&) = delete;
 
     virtual ~writer_node_base()    = default;
     virtual void send_up(const T&) = 0;
     virtual void send_up(T&&)      = 0;
 };
-
-template <typename... Parents>
-long max_rank(const std::tuple<std::shared_ptr<Parents>...>& ps)
-{
-    constexpr auto comp = [](const auto& x, const auto& y) {
-        return x->rank() < y->rank();
-    };
-    constexpr auto max_fn = [comp](const auto&... ps) {
-        return std::max<std::shared_ptr<reader_node_base>>({ps...}, comp);
-    };
-    return std::apply(max_fn, ps)->rank();
-}
 
 template <typename T, typename U>
 auto has_changed(T&& a, U&& b) -> decltype(!(a == b))
@@ -166,7 +180,8 @@ public:
     reader_node(T value)
         : current_(std::move(value))
         , last_(current_)
-    {}
+    {
+    }
 
     virtual void recompute() = 0;
     virtual void refresh()   = 0;

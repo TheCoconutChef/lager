@@ -9,6 +9,7 @@
 #include "lager/detail/traversal_topo.hpp"
 #include "lager/detail/traversal_topo_intrusive.hpp"
 #include "lager/detail/traversal_topo_naive_mmap.hpp"
+#include "lager/detail/traversal_treap.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -159,6 +160,7 @@ NONIUS_BENCHMARK("SC-T-BIMS",
                  traversal_fn<topo_intrusive_traversal>(make_simple_chain))
 NONIUS_BENCHMARK("SC-T-BIMSRB",
                  traversal_fn<topo_intrusive_traversal_rb>(make_simple_chain))
+NONIUS_BENCHMARK("SC-T-TREAP", traversal_fn<treap_traversal>(make_simple_chain))
 
 NONIUS_BENCHMARK("DC-DFS", traversal_fn<dfs_traversal>(make_diamond_chain))
 NONIUS_BENCHMARK("DC-T-CMM",
@@ -170,3 +172,5 @@ NONIUS_BENCHMARK("DC-T-BIMS",
                  traversal_fn<topo_intrusive_traversal>(make_diamond_chain))
 NONIUS_BENCHMARK("DC-T-BIMSRB",
                  traversal_fn<topo_intrusive_traversal_rb>(make_diamond_chain))
+NONIUS_BENCHMARK("DC-T-TREAP",
+                 traversal_fn<treap_traversal>(make_diamond_chain))
