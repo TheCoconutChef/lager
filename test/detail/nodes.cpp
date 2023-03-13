@@ -47,11 +47,11 @@ TEST_CASE("node, last value becomes visible")
     auto x = make_state_node(0);
 
     x->send_up(12);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(12 == x->last());
 
     x->send_up(42);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(42 == x->last());
 }
 
@@ -62,11 +62,11 @@ TEST_CASE("node, sending down")
     CHECK(5 == y->last());
 
     x->send_up(12);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(12 == y->last());
 
     x->send_up(42);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(42 == y->last());
 }
 
@@ -156,7 +156,7 @@ TEST_CASE("node, observing is consistent")
     auto wc = w->observers().connect(s);
 
     x->send_up(42);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(0 == s.count());
 
     x->notify();
@@ -172,7 +172,7 @@ TEST_CASE("node, bidirectional node sends values up")
     CHECK(5 == x->last());
     CHECK(5 == y->last());
 
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(42 == x->last());
     CHECK(42 == y->last());
 }
@@ -188,12 +188,12 @@ TEST_CASE("node, bidirectional mapping")
     CHECK(6 == y->last());
 
     y->send_up(42);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(41 == x->last());
     CHECK(42 == y->last());
 
     x->send_up(42);
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(42 == x->last());
     CHECK(43 == y->last());
 }
@@ -225,7 +225,7 @@ TEST_CASE("node, bidirectiona update is consistent")
     CHECK(5 == y->last());
     CHECK(13 == z->last());
 
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK((arr{{69, 42}}) == x->last());
     CHECK(69 == y->last());
     CHECK(42 == z->last());
@@ -236,9 +236,11 @@ TEST_CASE("node, sensors nodes reevaluate on send down")
     int count = 0;
     auto x    = make_sensor_node([&count] { return count++; });
     CHECK(0 == x->last());
-    x->send_down();
+
+    treap_traversal(x).visit();
     CHECK(1 == x->last());
-    x->send_down();
+
+    treap_traversal(x).visit();
     CHECK(2 == x->last());
 }
 
@@ -254,7 +256,7 @@ TEST_CASE("node, one node two parents")
     CHECK(12 == z->last());
 
     // Commit first root individually
-    x->send_down();
+    treap_traversal(x).visit();
     CHECK(13 == z->last());
     CHECK(0 == s.count());
     x->notify();
@@ -264,7 +266,7 @@ TEST_CASE("node, one node two parents")
 
     // Commit second root individually
     y->push_down(3);
-    y->send_down();
+    treap_traversal(y).visit();
     CHECK(4 == z->last());
     y->notify();
     CHECK(2 == s.count());
@@ -272,9 +274,9 @@ TEST_CASE("node, one node two parents")
     CHECK(2 == s.count());
 
     // Commit both roots together
-    x->send_down();
+    treap_traversal(x).visit();
     y->push_down(69);
-    y->send_down();
+    treap_traversal(y).visit();
     x->notify();
     y->notify();
     CHECK(71 == z->last());
@@ -283,12 +285,13 @@ TEST_CASE("node, one node two parents")
 
 TEST_CASE("node, rank is accurate")
 {
-    auto x = make_sensor_node([&count] { return count++; });
-    auto y = make_state_node(12);
-    auto z = make_xform_reader_node(map([](int a, int b) { return a + b; }),
+    int count = 0;
+    auto x    = make_sensor_node([&count] { return count++; });
+    auto y    = make_state_node(12);
+    auto z    = make_xform_reader_node(map([](int a, int b) { return a + b; }),
                                     std::make_tuple(x, y));
-    auto t = make_merge_reader_node(std::make_tuple(x, z));
-    auto u = make_xform_reader_node(
+    auto t    = make_merge_reader_node(std::make_tuple(x, z));
+    auto u    = make_xform_reader_node(
         map([](auto tuple) { return std::get<0>(tuple); }), std::make_tuple(t));
 
     CHECK(0 == x->rank);
@@ -296,4 +299,61 @@ TEST_CASE("node, rank is accurate")
     CHECK(1 == z->rank);
     CHECK(2 == t->rank);
     CHECK(3 == u->rank);
+}
+
+struct mock_traversal : treap_traversal
+{
+    mock_traversal(reader_node_base* n)
+        : treap_traversal(n)
+    {
+    }
+    void schedule(reader_node_base*) override { schedule_call_count++; }
+
+    int schedule_call_count = 0;
+};
+
+TEST_CASE("node, schedule iff multi parent node")
+{
+    auto s = make_state_node(0);
+    auto a = make_xform_reader_node(identity, std::make_tuple(s));
+    auto b = make_xform_reader_node(identity, std::make_tuple(s));
+    auto d = make_xform_reader_node(map([](auto a, auto b) { return a + b; }),
+                                    std::make_tuple(a, b));
+    auto c = make_xform_reader_node(identity, std::make_tuple(b));
+    auto t = mock_traversal(s.get());
+
+    c->schedule_or_send_down(t);
+    CHECK(t.schedule_call_count == 0);
+
+    d->schedule_or_send_down(t);
+    CHECK(t.schedule_call_count == 1);
+}
+
+TEST_CASE("traversal, no double hit")
+{
+    auto v        = std::vector<int>();
+    auto make_log = [&v](auto rank) {
+        return map([&v, rank](const auto&... xs) {
+            v.push_back(rank);
+            return std::get<0>(std::make_tuple(xs...));
+        });
+    };
+
+    auto a = make_state_node(0);
+    auto b = make_xform_reader_node(make_log(1), std::make_tuple(a));
+    auto c = make_xform_reader_node(make_log(1), std::make_tuple(a));
+    auto d = make_xform_reader_node(make_log(2), std::make_tuple(a, b));
+    auto e = make_xform_reader_node(make_log(3), std::make_tuple(d));
+    auto f = make_xform_reader_node(make_log(2), std::make_tuple(a, c));
+    v.clear();
+
+    a->push_down(10);
+    treap_traversal(a).visit();
+    CHECK(v.size() == 5);
+    CHECK(std::is_sorted(v.begin(), v.end()));
+
+    v.clear();
+    a->push_down(11);
+    a->send_down();
+    CHECK(v.size() > 5);
 }

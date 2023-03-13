@@ -64,24 +64,20 @@ TEST_CASE("merged transform")
     auto state    = lager::make_state(model_t{}, lager::transactional_tag{});
     auto ca       = state[&model_t::first].make();
     auto cb       = state[&model_t::second].make();
-    auto m        = lager::with(ca, cb).make();
+    auto m        = lager::with(cb, ca).make();
     auto tr       = m.map([&tr_count](const auto& tuple) {
-                   auto [a, b] = tuple;
+                   auto [b, a] = tuple;
                    CHECK(a <= b);
                    tr_count++;
                    return std::sqrt(b - a);
                }).make();
-
-    auto trv1 = tr;
-    auto trv2 = tr;
-    auto trv3 = tr;
-    auto trv4 = tr;
+    tr_count      = 0;
 
     ca.set(11);
     cb.set(21);
     lager::commit_bft(state);
 
-    CHECK(tr_count == 2);
+    CHECK(tr_count == 1);
 }
 
 TEST_CASE("with reducer enhancer")

@@ -4,7 +4,8 @@
 #include "traversal.hpp"
 #include <boost/intrusive/treap_set.hpp>
 
-namespace lager::detail {
+namespace lager {
+namespace detail {
 
 class treap_traversal : public traversal
 {
@@ -13,7 +14,8 @@ public:
     treap_traversal(const treap_traversal&)            = delete;
     treap_traversal& operator=(const treap_traversal&) = delete;
 
-    treap_traversal(const std::shared_ptr<reader_node_base>& root, std::size_t)
+    treap_traversal(const std::shared_ptr<reader_node_base>& root,
+                    std::size_t = 0)
         : treap_traversal(root.get())
     {
     }
@@ -46,4 +48,5 @@ private:
     schedule_t schedule_;
     hint_t hint_;
 };
-} // namespace lager::detail
+} // namespace detail
+} // namespace lager

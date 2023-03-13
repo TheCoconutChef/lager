@@ -14,7 +14,7 @@
 
 #include <lager/context.hpp>
 #include <lager/deps.hpp>
-#include <lager/detail/traversal_topo.hpp>
+#include <lager/detail/traversal_treap.hpp>
 #include <lager/effect.hpp>
 #include <lager/state.hpp>
 #include <lager/util.hpp>
@@ -170,7 +170,7 @@ private:
                                    p   = std::move(p),
                                    eff = LAGER_FWD(effect)]() mutable {
                             if constexpr (!is_transactional) {
-                                detail::topo_traversal<> t(this);
+                                detail::treap_traversal t(this);
                                 t.visit();
                                 base_t::notify();
                             }
@@ -189,7 +189,7 @@ private:
                     [&] {
                         if constexpr (!is_transactional) {
                             loop.post([this, p = std::move(p)]() mutable {
-                                detail::topo_traversal<> t(this);
+                                detail::treap_traversal t(this);
                                 t.visit();
                                 base_t::notify();
                                 if constexpr (has_futures)

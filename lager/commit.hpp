@@ -14,7 +14,7 @@
 
 #include <lager/detail/access.hpp>
 #include <lager/detail/nodes.hpp>
-#include <lager/detail/traversal_topo.hpp>
+#include <lager/detail/traversal_treap.hpp>
 #include <lager/util.hpp>
 
 namespace lager {
@@ -30,8 +30,8 @@ void send_down_root(RootCursorT&& root)
 template <typename RootCursorT>
 void send_down_root_bft(RootCursorT&& root)
 {
-    topo_traversal<> t{detail::access::roots(std::forward<RootCursorT>(root)),
-                       10};
+    treap_traversal t{detail::access::roots(std::forward<RootCursorT>(root)),
+                      0};
     t.visit();
 }
 template <typename RootCursorT>
