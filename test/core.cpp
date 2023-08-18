@@ -316,3 +316,18 @@ TEST_CASE("composing context with converter")
     ctx2.dispatch(child1_action{});
     CHECK(*store == 2);
 }
+
+struct fwd;
+fwd update(parent_action, fwd);
+
+TEST_CASE("store, forward declare")
+{
+    struct bar
+    {
+        lager::store<parent_action, fwd> s;
+    };
+}
+
+struct fwd
+{};
+fwd update(parent_action, fwd) { return {}; }

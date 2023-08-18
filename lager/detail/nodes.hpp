@@ -139,15 +139,16 @@ public:
     using signal_type = signal<const value_type&>;
 
     reader_node(T value)
-        : current_(std::move(value))
-        , last_(current_)
-    {}
+        : current_(std::make_unique<value_type>(std::move(value)))
+        , last_(std::make_unique<value_type>(*current_))
+    {
+    }
 
     virtual void recompute() = 0;
     virtual void refresh()   = 0;
 
-    const value_type& current() const { return current_; }
-    const value_type& last() const { return last_; }
+    const value_type& current() const { return *current_; }
+    const value_type& last() const { return *last_; }
 
     void link(std::weak_ptr<reader_node_base> child)
     {
@@ -163,8 +164,8 @@ public:
     template <typename U>
     void push_down(U&& value)
     {
-        if (has_changed(value, current_)) {
-            current_         = std::forward<U>(value);
+        if (has_changed(value, *current_)) {
+            *current_        = std::forward<U>(value);
             needs_send_down_ = true;
         }
     }
@@ -173,7 +174,7 @@ public:
     {
         recompute();
         if (needs_send_down_) {
-            last_            = current_;
+            *last_           = *current_;
             needs_send_down_ = false;
             needs_notify_    = true;
             for (auto& wchild : children_) {
@@ -193,7 +194,7 @@ public:
             notifying_guard_t notifying_guard(notifying_);
             bool garbage = false;
 
-            observers_(last_);
+            observers_(*last_);
             for (size_t i = 0, size = children_.size(); i < size; ++i) {
                 if (auto child = children_[i].lock()) {
                     child->notify();
@@ -220,8 +221,8 @@ private:
                         end(children_));
     }
 
-    value_type current_;
-    value_type last_;
+    std::unique_ptr<value_type> current_;
+    std::unique_ptr<value_type> last_;
     std::vector<std::weak_ptr<reader_node_base>> children_;
     signal_type observers_;
 

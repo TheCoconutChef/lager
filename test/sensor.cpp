@@ -60,3 +60,16 @@ TEST_CASE("sensor, watching")
     commit(x);
     CHECK(2 == s.count());
 }
+
+struct fwd;
+
+TEST_CASE("sensor, forward declare")
+{
+    struct bar
+    {
+        sensor<fwd> s;
+    };
+}
+
+struct fwd
+{};

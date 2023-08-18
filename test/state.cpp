@@ -247,3 +247,16 @@ TEST_CASE("state, check notifications after direct assignment to state")
     CHECK(childSpy.count() == 1);
     CHECK(parentSpy.count() == 1);
 }
+
+struct fwd;
+
+TEST_CASE("state, forward declare")
+{
+    struct bar
+    {
+        lager::state<fwd> s;
+    };
+}
+
+struct fwd
+{};

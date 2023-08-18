@@ -226,3 +226,18 @@ TEST_CASE("lenses over with expression")
     CHECK(person_data->name == "new name");
     CHECK(name.get() == "new name");
 }
+
+struct fwd;
+
+TEST_CASE("forward declare")
+{
+    struct bar
+    {
+        reader<fwd> r;
+        cursor<fwd> c;
+        constant<fwd> cc;
+    };
+}
+
+struct fwd
+{};
