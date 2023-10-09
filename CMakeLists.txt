@@ -85,6 +85,7 @@ if(lager_BUILD_TESTS)
   target_include_directories(lager-dev SYSTEM INTERFACE
     ${lager_SOURCE_DIR}
     ${Boost_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools/include
   )
   target_link_libraries(lager-dev INTERFACE lager
     ${Boost_LIBRARIES}
@@ -109,6 +110,7 @@ if(lager_BUILD_TESTS)
     COMMENT "Build and run all the tests and examples.")
 
   add_subdirectory(test)
+  add_subdirectory(benchmark)
 endif()
 
 # the library, with http debugger
