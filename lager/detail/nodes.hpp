@@ -39,6 +39,7 @@
 #pragma once
 
 #include <lager/detail/signal.hpp>
+#include <lager/detail/traversal.hpp>
 #include <lager/util.hpp>
 
 #include <zug/meta/pack.hpp>
@@ -75,6 +76,9 @@ struct node_schedule;
  */
 struct reader_node_base
 {
+    using hook_type_rb = boost::intrusive::set_member_hook<>;
+    hook_type_rb member_hook_rb_{};
+
     using hook_type_list = boost::intrusive::list_member_hook<
         boost::intrusive::link_mode<boost::intrusive::auto_unlink>>;
     hook_type_list member_hook_list_{};
@@ -89,6 +93,8 @@ struct reader_node_base
 
     virtual ~reader_node_base()                            = default;
     virtual void send_down()                               = 0;
+    virtual void schedule_or_send_down(traversal&)         = 0;
+    virtual void send_down(traversal&)                     = 0;
     virtual void notify()                                  = 0;
     virtual node_schedule& get_node_schedule()             = 0;
     virtual const node_schedule& get_node_schedule() const = 0;
@@ -254,6 +260,23 @@ public:
         }
     }
 
+    void schedule_or_send_down(traversal& t) override { this->send_down(t); }
+
+    void send_down(traversal& t) final
+    {
+        recompute();
+        if (needs_send_down_) {
+            last_            = current_;
+            needs_send_down_ = false;
+            needs_notify_    = true;
+            for (auto& wchild : children_) {
+                if (auto child = wchild.lock()) {
+                    child->schedule_or_send_down(t);
+                }
+            }
+        }
+    }
+
     void notify() final
     {
         using namespace std;
@@ -294,7 +317,7 @@ private:
     value_type last_;
     std::vector<std::weak_ptr<reader_node_base>> children_;
     signal_type observers_;
-    std::shared_ptr<node_schedule_t> node_schedule_;
+    std::shared_ptr<node_schedule> node_schedule_;
 
     bool needs_send_down_ = false;
     bool needs_notify_    = false;
@@ -351,6 +374,14 @@ public:
     {
         push_up(std::forward<T>(value),
                 std::make_index_sequence<sizeof...(Parents)>{});
+    }
+
+    void schedule_or_send_down(traversal& t) final
+    {
+        if constexpr (sizeof...(Parents) > 1)
+            t.schedule(this);
+        else
+            this->send_down(t);
     }
 
 private:
