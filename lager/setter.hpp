@@ -35,10 +35,11 @@ public:
     using value_type = typename ParentT::value_type;
 
     setter_node(std::shared_ptr<ParentT> p, FnT fn)
-        : base_t{p->current()}
+        : base_t{p->current(), p->get_node_schedule().get_or_create_next()}
         , parent_{std::move(p)}
         , setter_fn_{std::move(fn)}
-    {}
+    {
+    }
 
     void recompute() final
     {

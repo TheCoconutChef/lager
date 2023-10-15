@@ -30,7 +30,7 @@
  *     upwards in two fases.
  *
  * In general, sucessors know a lot about their predecessors, but
- * sucessors need to know very little or nothing from their sucessors.
+ * sucessors need to know very little or nothing from their successors.
  *
  * @todo We could eventually flatten nodes when the sucessors knows
  * the transducer of its predecessor, this could be done heuristically.
@@ -45,6 +45,7 @@
 #include <zug/tuplify.hpp>
 
 #include <algorithm>
+#include <boost/intrusive/set.hpp>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -64,6 +65,8 @@ constexpr struct
     }
 } owner_equals{};
 
+struct node_schedule;
+
 /*!
  * Interface for children of a node and is used to propagate
  * notifications.  The notifications are propagated in two steps,
@@ -72,16 +75,70 @@ constexpr struct
  */
 struct reader_node_base
 {
-    reader_node_base()                        = default;
-    reader_node_base(reader_node_base&&)      = default;
-    reader_node_base(const reader_node_base&) = delete;
-    reader_node_base& operator=(reader_node_base&&) = default;
+    using hook_type_list = boost::intrusive::list_member_hook<
+        boost::intrusive::link_mode<boost::intrusive::auto_unlink>>;
+    hook_type_list member_hook_list_{};
+
+    using node_schedule_t = node_schedule;
+
+    reader_node_base()                                   = default;
+    reader_node_base(reader_node_base&&)                 = default;
+    reader_node_base(const reader_node_base&)            = delete;
+    reader_node_base& operator=(reader_node_base&&)      = default;
     reader_node_base& operator=(const reader_node_base&) = delete;
 
-    virtual ~reader_node_base() = default;
-    virtual void send_down()    = 0;
-    virtual void notify()       = 0;
+    virtual ~reader_node_base()                            = default;
+    virtual void send_down()                               = 0;
+    virtual void notify()                                  = 0;
+    virtual node_schedule& get_node_schedule()             = 0;
+    virtual const node_schedule& get_node_schedule() const = 0;
+    virtual long rank() const                              = 0;
 };
+
+bool operator<(const reader_node_base& x, const reader_node_base& y)
+{
+    return x.rank() < y.rank();
+}
+
+struct node_schedule
+{
+    using list_t = boost::intrusive::list<
+        reader_node_base,
+        boost::intrusive::member_hook<reader_node_base,
+                                      typename reader_node_base::hook_type_list,
+                                      &reader_node_base::member_hook_list_>,
+        boost::intrusive::constant_time_size<false>>;
+    using hook_type_rb = boost::intrusive::set_member_hook<>;
+    hook_type_rb member_hook_rb_{};
+    long rank_                           = 0;
+    list_t nodes_                        = {};
+    std::shared_ptr<node_schedule> next_ = {};
+
+    const std::shared_ptr<node_schedule>& get_or_create_next()
+    {
+        if (!next_) {
+            next_        = std::make_shared<node_schedule>();
+            next_->rank_ = rank_ + 1;
+        }
+        return next_;
+    }
+};
+
+bool operator<(const node_schedule& x, const node_schedule& y)
+{
+    return x.rank_ < y.rank_;
+}
+
+template <typename... Parents>
+const std::shared_ptr<node_schedule>&
+next_rank(const std::tuple<std::shared_ptr<Parents>...>& ps)
+{
+    constexpr auto comp = [](const auto& x, const auto& y) { return *x < *y; };
+    constexpr auto max_fn = [comp](const auto&... ps) {
+        return std::max<std::shared_ptr<reader_node_base>>({ps...}, comp);
+    };
+    return std::apply(max_fn, ps)->get_node_schedule().get_or_create_next();
+}
 
 /*!
  * Interface for nodes that can send values back to their parents.
@@ -89,10 +146,10 @@ struct reader_node_base
 template <typename T>
 struct writer_node_base
 {
-    writer_node_base()                        = default;
-    writer_node_base(writer_node_base&&)      = default;
-    writer_node_base(const writer_node_base&) = delete;
-    writer_node_base& operator=(writer_node_base&&) = default;
+    writer_node_base()                                   = default;
+    writer_node_base(writer_node_base&&)                 = default;
+    writer_node_base(const writer_node_base&)            = delete;
+    writer_node_base& operator=(writer_node_base&&)      = default;
     writer_node_base& operator=(const writer_node_base&) = delete;
 
     virtual ~writer_node_base()    = default;
@@ -138,16 +195,29 @@ public:
     using value_type  = T;
     using signal_type = signal<const value_type&>;
 
-    reader_node(T value)
+    reader_node(T value,
+                const std::shared_ptr<node_schedule>& ns =
+                    std::make_shared<node_schedule>())
         : current_(std::move(value))
         , last_(current_)
-    {}
+        , node_schedule_(ns)
+    {
+    }
 
     virtual void recompute() = 0;
     virtual void refresh()   = 0;
 
     const value_type& current() const { return current_; }
     const value_type& last() const { return last_; }
+    node_schedule& get_node_schedule() override final
+    {
+        return *node_schedule_;
+    }
+    const node_schedule& get_node_schedule() const override final
+    {
+        return *node_schedule_;
+    }
+    long rank() const override { return this->get_node_schedule().rank_; }
 
     void link(std::weak_ptr<reader_node_base> child)
     {
@@ -224,6 +294,7 @@ private:
     value_type last_;
     std::vector<std::weak_ptr<reader_node_base>> children_;
     signal_type observers_;
+    std::shared_ptr<node_schedule_t> node_schedule_;
 
     bool needs_send_down_ = false;
     bool needs_notify_    = false;
@@ -256,9 +327,12 @@ class inner_node<ValueT, zug::meta::pack<Parents...>, Base>
 
 public:
     inner_node(ValueT init, std::tuple<std::shared_ptr<Parents>...>&& parents)
-        : base_t{std::move(init)}
+        : base_t{std::move(init),
+                 sizeof...(Parents) == 0 ? std::make_shared<node_schedule>()
+                                         : next_rank(parents)}
         , parents_{std::move(parents)}
-    {}
+    {
+    }
 
     void refresh() final
     {

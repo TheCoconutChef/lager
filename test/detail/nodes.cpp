@@ -280,3 +280,76 @@ TEST_CASE("node, one node two parents")
     CHECK(71 == z->last());
     CHECK(3 == s.count());
 }
+
+TEST_CASE("node, schedule or send down")
+{
+    struct spy_traversal : traversal
+    {
+        std::vector<reader_node_base*> calls = {};
+        void schedule(reader_node_base* n) override final
+        {
+            calls.push_back(n);
+        }
+    };
+
+    auto x = make_state_node(12);
+    auto y = make_xform_reader_node(lager::identity, std::make_tuple(x));
+    auto z = make_xform_reader_node(map([](int a, int b) { return a + b; }),
+                                    std::make_tuple(x, y));
+
+    x->push_down(13);
+    auto t = spy_traversal();
+    x->schedule_or_send_down(t);
+
+    CHECK(t.calls.size() == 2);
+    CHECK(t.calls.at(0) == z.get());
+    CHECK(t.calls.at(1) == z.get());
+}
+
+TEST_CASE("node, rank increments")
+{
+    int count = 0;
+    auto x    = make_sensor_node([&count] { return count++; });
+    auto y    = make_state_node(12);
+    auto z    = make_xform_reader_node(map([](int a, int b) { return a + b; }),
+                                    std::make_tuple(x, y));
+    auto t    = make_merge_reader_node(std::make_tuple(x, z));
+    auto u    = make_xform_reader_node(
+        map([](auto tuple) { return std::get<0>(tuple); }), std::make_tuple(t));
+
+    CHECK(0 == x->rank());
+    CHECK(0 == y->rank());
+    CHECK(1 == z->rank());
+    CHECK(2 == t->rank());
+    CHECK(3 == u->rank());
+}
+
+TEST_CASE("node schedule, default init")
+{
+    auto ns = node_schedule();
+
+    CHECK(ns.rank_ == 0);
+    CHECK(ns.nodes_.empty());
+    CHECK(ns.next_ == nullptr);
+    CHECK(!ns.member_hook_rb_.is_linked());
+}
+
+TEST_CASE("node schedule, schedule of next rank is unique")
+{
+    auto ns    = node_schedule();
+    auto next1 = ns.get_or_create_next();
+    auto next2 = ns.get_or_create_next();
+
+    CHECK(ns.next_);
+    CHECK(next1 == next2);
+    CHECK(next1->rank_ == ns.rank_ + 1);
+}
+
+TEST_CASE("node, node schedule is unique")
+{
+    auto x = make_state_node(12);
+    auto y = make_xform_reader_node(map(lager::identity), std::make_tuple(x));
+    auto z = make_xform_reader_node(map(lager::identity), std::make_tuple(x));
+
+    CHECK(&y->get_node_schedule() == &z->get_node_schedule());
+}
