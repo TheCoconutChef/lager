@@ -13,6 +13,7 @@
 #pragma once
 
 #include <lager/detail/access.hpp>
+#include <lager/detail/traversal_topo_intrusive.hpp>
 #include <lager/util.hpp>
 
 namespace lager {
@@ -22,7 +23,9 @@ namespace detail {
 template <typename RootCursorT>
 void send_down_root(RootCursorT&& root)
 {
-    (void) detail::access::roots(std::forward<RootCursorT>(root))->send_down();
+    auto t = topo_traversal_set(
+        detail::access::roots(std::forward<RootCursorT>(root)));
+    t.visit();
 }
 
 template <typename RootCursorT>

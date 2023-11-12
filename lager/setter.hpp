@@ -14,6 +14,7 @@
 
 #include <lager/detail/access.hpp>
 #include <lager/detail/nodes.hpp>
+#include <lager/detail/traversal_topo_intrusive.hpp>
 
 #include <lager/cursor.hpp>
 #include <lager/tags.hpp>
@@ -57,7 +58,8 @@ public:
         this->push_down(value);
         if constexpr (std::is_same_v<TagT, automatic_tag>) {
             recomputed_ = true;
-            this->send_down();
+            auto t      = topo_traversal_set(this);
+            t.visit();
             this->notify();
         }
     }
@@ -68,7 +70,8 @@ public:
         this->push_down(std::move(value));
         if constexpr (std::is_same_v<TagT, automatic_tag>) {
             recomputed_ = true;
-            this->send_down();
+            auto t      = topo_traversal_set(this);
+            t.visit();
             this->notify();
         }
     }

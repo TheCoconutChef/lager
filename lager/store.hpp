@@ -14,6 +14,7 @@
 
 #include <lager/context.hpp>
 #include <lager/deps.hpp>
+#include <lager/detail/traversal_topo_intrusive.hpp>
 #include <lager/effect.hpp>
 #include <lager/state.hpp>
 #include <lager/util.hpp>
@@ -154,19 +155,16 @@ private:
                 else
                     return promise::invalid();
             }();
-            loop.post([this,
-                       p      = std::move(p),
-                       action = std::move(action)]() mutable {
-                base_t::push_down(invoke_reducer<deps_t>(
-                    reducer,
-                    base_t::current(),
-                    std::move(action),
-                    [&](auto&& effect) {
+            loop.post(
+                [this, p = std::move(p), action = std::move(action)]() mutable {
+                    const auto with_effect_handler = [this, &p, &action](
+                                                         auto&& effect) {
                         loop.post([this,
                                    p   = std::move(p),
                                    eff = LAGER_FWD(effect)]() mutable {
                             if constexpr (!is_transactional) {
-                                base_t::send_down();
+                                auto t = detail::topo_traversal_set(this);
+                                t.visit();
                                 base_t::notify();
                             }
                             if constexpr (std::is_same_v<void,
@@ -180,19 +178,26 @@ private:
                                     std::move(f).then(std::move(p));
                             }
                         });
-                    },
-                    [&] {
+                    };
+                    const auto without_effect_handler = [this, &p, &action] {
                         if constexpr (!is_transactional) {
                             loop.post([this, p = std::move(p)]() mutable {
-                                base_t::send_down();
+                                auto t = detail::topo_traversal_set(this);
+                                t.visit();
                                 base_t::notify();
                                 if constexpr (has_futures)
                                     p();
                             });
                         } else if constexpr (has_futures)
                             p();
-                    }));
-            });
+                    };
+                    base_t::push_down(
+                        invoke_reducer<deps_t>(reducer,
+                                               base_t::current(),
+                                               std::move(action),
+                                               with_effect_handler,
+                                               without_effect_handler));
+                });
             return std::move(f);
         }
     };
